@@ -1,0 +1,23 @@
+{
+    "raisecom":{
+
+        "comando1":"oam enable",
+        "comando2":"oam passive",
+        "comando3":"oam notify dying-gasp enable"
+
+    },
+
+    "cisco":{
+
+        "comando1":"configure terminal",
+        "comando2":"interface GigabitEthernet0/0/2",
+        "comando3":"description Prueba-31/07/2023-SCRIPT_PYTHON"
+
+    },
+
+    "huawei":{
+
+        "comando1":"display version"
+
+    }
+}

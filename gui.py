@@ -6,6 +6,8 @@ import os
 import threading
 from ping3 import ping
 import re
+from main import proceso
+import asyncio
 
 # Define la paleta de colores
 COLOR1 = wx.Colour(20, 79, 116)
@@ -33,19 +35,14 @@ class MainFrame(wx.Frame):
         self.title_label.SetFont(wx.Font(18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
         
         # Buscadores de archivos
-        self.txt_file_path = ""
         self.excel_file_path = ""
         
-        self.txt_file_picker_btn = wx.Button(self.panel, label="Selecciona el archivo con los comandos:")
-        self.txt_file_picker_btn.SetBackgroundColour(COLOR5)
-        self.txt_file_picker_btn.Bind(wx.EVT_BUTTON, self.on_txt_file_picker)
         
         self.excel_file_picker_btn = wx.Button(self.panel, label="Selecciona el archivo con las direcciones IP:")
         self.excel_file_picker_btn.SetBackgroundColour(COLOR5)
         self.excel_file_picker_btn.Bind(wx.EVT_BUTTON, self.on_excel_file_picker)
         
         # Agregar etiquetas y botones al sizer del cuadro
-        file_pick_sizer.Add(self.txt_file_picker_btn, 0, wx.EXPAND | wx.ALL, 5)
         file_pick_sizer.Add(self.excel_file_picker_btn, 0, wx.EXPAND | wx.ALL, 5)
         
         # Sizer horizontal para los botones "Cargar IPs" y "Ejecutar comandos"
@@ -134,6 +131,12 @@ class MainFrame(wx.Frame):
         print(str(status))
         wx.CallAfter(self.update_grid_with_ping_result, ip, status)
 
+    async def command_execute(self, ips):
+        print(ips)
+        for host in ips:
+            await proceso(host)
+        #await proceso(ip)
+
     def update_grid_with_ping_result(self, ip, status):
         num_rows = self.success_grid.GetNumberRows()
         for row in range(num_rows):
@@ -193,7 +196,11 @@ class MainFrame(wx.Frame):
 
     def on_execute_commands(self, event):
         # Aquí el código para ejecutar los comandos con las IPs cargadas
-        event.Skip()
+        num_rows = self.success_grid.GetNumberRows()
+        ips_to_validate = [self.success_grid.GetCellValue(row, 1) for row in range(num_rows)]
+        asyncio.run(self.command_execute(ips_to_validate))
+        """loop = asyncio.get_event_loop()
+        loop.create_task(self.command_execute(ips_to_validate))"""
 
     def prueba( self, event ):
         row = int(event.Row)

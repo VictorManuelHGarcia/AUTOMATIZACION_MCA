@@ -5,13 +5,12 @@ from equipos.cisco import cisco
 from equipos.huawei import huawei
 
 IP_CISCO = "10.4.1.62"
-IP_RAISECOM = "10.4.1.47"
+IP_LAB2924 = "10.4.1.47"
 IP_HUAWEI = "10.4.31.137"
 
 IP_2608 = "10.4.191.112"
 IP_RAX711C = "10.4.184.227"
 IP_RAX721 = ""
-IP_2924 = ""
 IP_RAX711R = "10.5.4.38"
 
 USER_MCA = "MCA"
@@ -57,12 +56,16 @@ async def proceso(ip):
         await reader.readuntil(b"Password:")
         writer.write(password + "\n")
 
-        if await find(reader, b"#") or await find(reader, b"<"):
+        if await find(reader, b"#"):
             print("Ya entramos")
+            pp = b"#"
+            break
+        elif await find(reader, b">"):
+            pp = b">"
             break
 
     if modelo == "raisecom":
-        await raisecom(reader, writer)
+        await raisecom(reader, writer, pp)
     elif modelo == "huawei":
         await huawei(reader, writer)
     elif modelo == "cisco":
@@ -87,10 +90,10 @@ async def isAN(prompt):
         print("Es un CPE")
 
 async def main():
-    await proceso(IP_2608)
+    await proceso("10.4.37.131")
 
 
-asyncio.run(main())
+#asyncio.run(main())
 
     #VALIDACION DE PUERTO RAISECOM
 """writer.write("show run int port-list 27\n")

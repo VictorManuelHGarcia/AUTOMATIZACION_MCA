@@ -4,7 +4,10 @@ import asyncio
 IP_PAN = "10.4.33.193"
 
 user = 0x726f647269676f2e6469617a
-USER= format(user, 'x')
+password = 0x686f6c613132333435363839313040
+TACACS_USER = bytes_hex.decode('utf-8')
+TACACS_PASS = format(password, 'x')
+
 PASSWORD = ""
 
 segmento = "" 
@@ -38,4 +41,4 @@ async def main():
 
 
 #asyncio.run(main())
-print(USER)
+print(TACACS_PASS)

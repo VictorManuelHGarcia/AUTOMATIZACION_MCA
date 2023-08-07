@@ -4,72 +4,102 @@ from equipos.raisecom import raisecom
 from equipos.cisco import cisco
 from equipos.huawei import huawei
 
-IP_CISCO = "10.4.1.62"
-IP_LAB2924 = "10.4.1.47"
-IP_HUAWEI = "10.4.31.137"
 
-IP_2608 = "10.4.191.112"
-IP_RAX711C = "10.4.184.227"
-IP_RAX721 = ""
-IP_RAX711R = "10.5.4.38"
-
+#CREDENCIALES
 USER_MCA = "MCA"
 USER_MCA_MIN = "mca"
-USER_RAISECOM = "raisecom"
-USER_HUAWEI = "Admin"
-
 PASS_MCA = "M3tr0c4rr13r#"
+
+USER_RAISECOM = "raisecom"
 PASS_RAISECOM = "raisecom"
+
+USER_HUAWEI = "Admin"
 PASS_HUAWEI = "admin@huawei.com"
 
+TACACS_USER = bytes.fromhex("726f647269676f2e6469617a").decode('utf-8')
+TACACS_PASS = bytes.fromhex("686f6c613132333435363839313040").decode('utf-8')
+
+#EQUIPOS DE PRUEBA
+
+#RAISECOM
+IP_LAB2924 = "10.4.1.47"
+IP_RAX711C = "10.4.184.227"
+IP_RAX721 = "10.4.169.146"
+IP_RAX711R = "10.5.4.38"
+IP_2608 = "10.4.191.112"
+IP_TEPIC = "10.4.130.40"
+#CISCO
+IP_CISCO = "10.4.1.62"
+IP_ME = "10.4.37.133"
+
+#HUAWEI
+IP_HUAWEI = "10.4.31.137"
+
+
+
+#FUNCION PARA CADA IP
 async def proceso(ip):
     host = ip
     port = 23  
-
+    limit = 3
+    credentials = [{'user':USER_MCA, 'pass' : PASS_MCA}, 
+                   {'user':USER_RAISECOM, 'pass':PASS_RAISECOM}, 
+                   {'user':USER_HUAWEI, 'pass':PASS_HUAWEI},
+                   {'user':TACACS_USER, 'pass':TACACS_PASS},
+                   {'user':USER_MCA_MIN, 'pass':PASS_MCA}]
+    
+    flag = False
     # Establecer la conexión Telnet
-    reader, writer = await telnetlib3.open_connection(host, port)
+    for sesion in range(2):
+        reader, writer = await telnetlib3.open_connection(host, port)
+        #LEER EL PROMPT
+        prompt = b"#"
+        modelo = None
 
-    #LEER EL PROMPT
-    credentials = [{'user':USER_MCA, 'pass' : PASS_MCA}, {'user':USER_MCA_MIN, 'pass':PASS_MCA}]
-    prompt = b"#"
-    modelo = ""
+        #VERIFICAR RAMA DEL VENDOR
+        if await find(reader, b"Login:"):
+            modelo = "raisecom"
+        elif await find(reader, b"Username:"):
+            modelo = "cisco o huawei"
 
+        #MAXIMO DE 3 INTENTOS POR SESION
+        for credential in range(limit):
+            i = credentials[credential + (limit*sesion)]
+            #print(i)
+            #CARGAR CREDENCIALES
+            username = i['user'] ; password = i['pass']
+            writer.write(username + "\n")
+            await reader.readuntil(b"Password:")
+            writer.write(password + "\n")
 
-    if await find(reader, b"Login:"):
-        modelo = "raisecom"
-        credentials.append({'user':USER_RAISECOM, 'pass':PASS_RAISECOM})
-    elif await find(reader, b"Username: "):
-        modelo = "cisco"
-    elif await find(reader, b"Username:"):
-        modelo = "huawei"
-        credentials.append({'user':USER_HUAWEI, 'pass':PASS_HUAWEI})
-        prompt = b">"
-
-    for i in credentials:
-        username = i['user'] ; password = i['pass']
-        #print(i)
-        #inicio de sesion
-        #await reader.readuntil(login_tag)
-        writer.write(username + "\n")
-
-        # Contraseña
-        await reader.readuntil(b"Password:")
-        writer.write(password + "\n")
-
-        if await find(reader, b"#"):
-            print("Ya entramos")
-            pp = b"#"
-            break
-        elif await find(reader, b">"):
-            pp = b">"
+            #VERIFICAR SI ENTRAMOS
+            if await find(reader, b"#"):
+                if not modelo == "raisecom":
+                    modelo = "cisco"
+                print("Ya entramos")
+                pp = b"#"
+                flag = True
+                break
+            elif await find(reader, b">"):
+                if not modelo == "raisecom":
+                    modelo = "huawei"
+                pp = b">"
+                flag = True
+                break
+        
+        #YA INGRESAMOS
+        if flag:
+            print(modelo)
             break
 
     if modelo == "raisecom":
         await raisecom(reader, writer, pp)
     elif modelo == "huawei":
-        await huawei(reader, writer)
+        #await huawei(reader, writer)
+        print("es Huawei")
     elif modelo == "cisco":
-        await cisco(reader, writer)
+        #await cisco(reader, writer)
+        print("es Cisco")
 
     writer.write("exit\n")
     await writer.drain()
@@ -83,17 +113,12 @@ async def find(reader, word, max_time=1):
     except:
         return False
 
-async def isAN(prompt):
-    if "AN".encode('utf-8') in prompt:
-        print("Es un AN")
-    else:
-        print("Es un CPE")
 
 async def main():
-    await proceso("10.4.37.131")
+    await proceso(IP_LAB2924)
 
 
-#asyncio.run(main())
+asyncio.run(main())
 
     #VALIDACION DE PUERTO RAISECOM
 """writer.write("show run int port-list 27\n")
@@ -198,13 +223,3 @@ output = await reader.readuntil(b"#")
 print(output.decode('utf-8'))
 
 """
-
-#Inhabilitar escritor
-
-
-# Ejecutar el bucle de eventos para conectar y obtener la salida
-
-"""# Paso 1: Abrir el archivo en modo lectura
-    with open('comandos.json', 'r') as archivo_json:
-        # Paso 2: Cargar el contenido JSON desde el archivo
-        comandos = json.load(archivo_json)"""

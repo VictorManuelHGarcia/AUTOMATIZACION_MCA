@@ -1,0 +1,102 @@
+"""writer.write("show run int port-list 27\n")
+    if await find(reader, b"!"):
+        print("Puerto ocupado")
+    else:
+        print("Puerto disponible")
+    output = await reader.readuntil(b"#")"""
+
+#print(output.decode('utf-8'))
+
+"""#Aplicar comandos del json
+for i in comandos[modelo]:
+    print(comandos[modelo][i])
+    writer.write(comandos[modelo][i] + "\n")
+    output = await reader.readuntil(b"#") 
+    print(output.decode('utf-8'))"""
+
+#VALIDACION DE VLAN RAISECOM
+"""vlan = b"1199"
+writer.write("show vlan "+ str(vlan)+ "\n")
+print("show vlan "+ vlan.decode() + "\n")
+if await find(reader, vlan.decode()):
+    print("VLAN ocupada")
+else:
+    print("VLAN disponible")
+output = await reader.readuntil(b"#") """
+
+#print(output.decode('utf-8'))
+
+
+"""writer.write("show bridge-domain 1199\n")
+
+# Leer la salida del comando
+output = await reader.readuntil(b"#") 
+#display += output)
+
+texto = output.decode('utf-8')
+
+# Depurar buffer por completo
+#print(output.decode('utf-8'))
+
+if "GigabitEthernet0/0/1 " in texto:
+    writer.write("show running-config interface GigabitEthernet0/0/1 \n")
+    output = await reader.readuntil(b"#") 
+    print(output.decode('utf-8'))
+
+#await reader.readuntil(b"#")  """
+
+"""
+# Enviar comando
+writer.write("show version\n")
+
+output = await reader.readuntil(b" --More-- ")
+if output :
+    display = output
+    print("smn")
+writer.write(chr(32))
+
+output = await reader.readuntil(b" --More-- ")
+if output :
+    display += output
+    print("smn")
+writer.write(chr(32))
+
+print("hooa")
+
+
+writer.write("show bridge-domain 1199\n")
+
+# Leer la salida del comando
+output = await reader.readuntil(b"#") 
+#display += output)
+
+texto = output.decode('utf-8')
+
+# Depurar buffer por completo
+#print(output.decode('utf-8'))
+
+if "GigabitEthernet0/0/1 " in texto:
+    writer.write("show running-config interface GigabitEthernet0/0/1 \n")
+    output = await reader.readuntil(b"#") 
+    print(output.decode('utf-8'))
+"""
+
+
+"""
+writer.write("configure terminal\n")
+await reader.readuntil(b"#")  
+
+#Configuracion
+writer.write("interface GigabitEthernet0/0/2\n")
+await reader.readuntil(b"#")  
+writer.write("description PRUEBA-PYTHON\n")
+await reader.readuntil(b"#")  
+writer.write("end\n")
+await reader.readuntil(b"#")  
+
+#Resultado
+writer.write("show run interface GigabitEthernet0/0/2\n")
+output = await reader.readuntil(b"#") 
+print(output.decode('utf-8'))
+
+"""

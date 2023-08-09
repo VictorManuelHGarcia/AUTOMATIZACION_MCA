@@ -4,19 +4,10 @@ import asyncio
 async def find(reader, word, max_time=1):
     try:
         response = await asyncio.wait_for(reader.readuntil(word), timeout=max_time)
-        response = True
     except:
         response = False
-    #print(response)
     return response
-
-async def isAN(prompt):
-    if "AN".encode('utf-8') in prompt:
-        print("Es un AN")
-    else:
-        print("Es un CPE")
         
-
 async def raisecom(reader, writer,prompt):
     if prompt == b">":
         writer.write("enable\n") 
@@ -29,7 +20,7 @@ async def raisecom(reader, writer,prompt):
     if "ISCOM2608".encode('utf-8') in output:
         #llamar proceso del modelo
         #await ISCOM2608(reader, writer)
-        print("Es un AN")
+        print("Es un CPE")
         print("Es un ISCOM2608G")
     elif "RAX711-C".encode('utf-8') in output:
         #await RAX711C(reader, writer)
@@ -42,7 +33,7 @@ async def raisecom(reader, writer,prompt):
     elif "RAX721".encode('utf-8') in output:
         print("Es un AN")
         print("Es un RAX721")
-        print(await puertos2(reader, writer))
+        await puertos2(reader, writer)
     elif "ISCOM2924".encode('utf-8') in output:
         print("Es un AN")
         print("Es un ISCOM2924")
@@ -51,7 +42,7 @@ async def raisecom(reader, writer,prompt):
     elif "ISCOM2948".encode('utf-8') in output:
         print("Es un AN")
         print("Es un ISCOM2948")
-        print(await puertos(reader,writer,52))
+        await puertos(reader,writer,52)
     else:
         print("Modelo desconocido")
     
@@ -166,7 +157,7 @@ async def puertos(reader, writer, value):
     writer.write("sh int port-list 1-" + str(value) + " des\n")
     #await reader.readline()
     out = await reader.readuntil(b"#")
-    print(out.decode('utf-8'))
+    #print(out.decode('utf-8'))
     #Contador de Puertos Disponibles:
     Contador = out.decode('utf-8').split()
     ports = []
@@ -182,19 +173,19 @@ async def puertos(reader, writer, value):
 
 async def puertos2(reader, writer):
     writer.write("show interface brief\n")
-    #await reader.readline()
-    output = await reader.readuntil(b" --More-- ")
+    out = await paginar(reader, writer)
+    """output = await reader.readuntil(b" --More-- ")
     if output :
         out = output
         
-    writer.write(chr(32))
+    writer.write(chr(32))"""
     out += await reader.readuntil(b"#")
-    print(out.decode())
+    #print(out.decode())
     #Contador de Puertos Disponibles:
     Contador = out.decode('utf-8').split()
     ports = []
     for i in range(0, len(Contador)):
-        if re.match(r'TGE1/1/[1-4]', Contador[i]):
+        if re.match(r'TGE1/[1-9]/[1-9]+', Contador[i]):
             if not "TMCA" in Contador[i+8]:
                 aux = Contador[i].split('TGE')
                 ports.append("tengigabitethernet " + aux[1])
@@ -211,15 +202,15 @@ async def puertos2(reader, writer):
     return ports
 
 async def paginar(reader, writer):
-    output = ""
+    output = "".encode()
     while True:
-        res = await find(reader, "--More--")
-        if res:
-            output += res
-            writer.write(chr(32))
-        else:
-            res = await find(reader, b"#")
-            if res:
-                output += res    
+        try:
+            aux = await find(reader, b" --More-- ")
+            if aux :
+                output += aux
+                writer.write(chr(32))
+            else:
+                break
+        except:
             break
     return output

@@ -6,7 +6,7 @@ import os
 import threading
 from ping3 import ping
 import re
-from main import proceso
+from main import Worker
 import asyncio
 
 # Define la paleta de colores
@@ -108,6 +108,7 @@ class MainFrame(wx.Frame):
         self.load_ips_btn.Hide()
         
         self.success_grid.Bind( wx.grid.EVT_GRID_SELECT_CELL, self.prueba )
+        self.worker = Worker()
 
     def on_validate_connectivity(self, event):
         num_rows = self.success_grid.GetNumberRows()
@@ -128,13 +129,13 @@ class MainFrame(wx.Frame):
 
     def ping_ip_and_update_grid(self, ip):
         status = self.ping_ip(ip)
-        print(str(status))
+        #print(str(status))
         wx.CallAfter(self.update_grid_with_ping_result, ip, status)
 
     async def command_execute(self, ips):
-        print(ips)
+        #print(ips)
         for host in ips:
-            await proceso(host)
+            await self.worker.process(host)
         #await proceso(ip)
 
     def update_grid_with_ping_result(self, ip, status):
@@ -155,7 +156,7 @@ class MainFrame(wx.Frame):
             patron_ip = r'^(25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})\.(25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})\.(25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})\.(25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})$'
             if re.match(patron_ip, ip):
                 
-                print(type(ip))
+                #print(type(ip))
                 return response_time is not None
             else:
                 print("Esta IP no es valida")

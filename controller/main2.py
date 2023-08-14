@@ -1,12 +1,11 @@
 import telnetlib3
 import asyncio
-from equipos.raisecom import Raisecom
+from equipos.raisecom import raisecom
 from equipos.cisco import cisco
 from equipos.huawei import huawei
 import time
 import re
-import wx
-
+import concurrent.futures
 #CREDENCIALES
 USER_MCA = "MCA"
 USER_MCA_MIN = "mca"
@@ -45,16 +44,16 @@ async def find(reader, word, max_time=1):
         return response.decode('utf-8')
     except:
         return False
-
 class Worker:
-    
     def __init__(self):
-        self.reader = None ; self.writer = None
-        self.credentials = [{'user':USER_RAISECOM, 'pass':PASS_RAISECOM},
-                    {'user':USER_MCA, 'pass' : PASS_MCA}, 
-                    {'user':TACACS_USER, 'pass':TACACS_PASS},
-                    {'user':USER_MCA_MIN, 'pass':PASS_MCA},
-                    {'user':USER_HUAWEI, 'pass':PASS_HUAWEI}]
+        self.reader = None
+        self.writer = None
+        self.reader_lock = asyncio.Lock()  # Agregamos un semáforo (lock) para sincronización
+        self.credentials = [{'user': USER_RAISECOM, 'pass': PASS_RAISECOM},
+                            {'user': USER_MCA, 'pass': PASS_MCA},
+                            {'user': TACACS_USER, 'pass': TACACS_PASS},
+                            {'user': USER_MCA_MIN, 'pass': PASS_MCA},
+                            {'user': USER_HUAWEI, 'pass': PASS_HUAWEI}]
         self.host = None
         self.PORT = 23
         self.LIMIT_SESSION = 3
@@ -62,37 +61,27 @@ class Worker:
         self.model = None
         self.id = 0
         self.table = None
-        self.controller = None
+
     async def auth(self):
         flag = False
-        # Establecer la conexión Telnet
         for sesion in range(2):
             self.reader, self.writer = await telnetlib3.open_connection(self.host, self.PORT)
-            #LEER EL PROMPT
             self.prompt = b"#"
             self.model = None
 
-            #VERIFICAR RAMA DEL VENDOR
             if await find(self.reader, b"Login:"):
                 self.model = "raisecom"
-                self.controller = Raisecom(self)
             elif await find(self.reader, b"Username:"):
                 self.model = "cisco o huawei"
 
-            #MAXIMO DE 3 INTENTOS POR SESION
             for credential in range(self.LIMIT_SESSION):
-                i = self.credentials[credential + (self.LIMIT_SESSION*sesion)]
-                #print(i)
-                #CARGAR CREDENCIALES
-                username = i['user'] ; password = i['pass']
+                i = self.credentials[credential + (self.LIMIT_SESSION * sesion)]
+                username = i['user']
+                password = i['pass']
                 self.writer.write(username + "\n")
-                await self.writer.drain()
-                await self.writer.drain()
                 await self.reader.readuntil(b"Password:")
                 self.writer.write(password + "\n")
-                await self.writer.drain()
 
-                #VERIFICAR SI ENTRAMOS
                 if await find(self.reader, b"#"):
                     if not self.model == "raisecom":
                         self.model = "cisco"
@@ -107,42 +96,27 @@ class Worker:
                     flag = True
                     break
             
-            #YA INGRESAMOS
             if flag:
                 self.writer.write("\n")
-                await self.writer.drain()
-                text = await find(self.reader,b"#")
+                text = await find(self.reader, b"#")
                 self.writer.write("\n")
-                await self.reader.readuntil(b"#")
                 text = re.sub(r'[\r\n\s+]', '', text)
                 self.edit_table(self.id, 2, text)
-                #print(modelo)
                 break
 
-
-    async def process(self, ip, id):
+    async def process(self, ip):
         start_time = time.time()
         self.host = ip
-        self.id = id
         
-        await self.auth()
+        async with self.reader_lock:  # Aseguramos que solo una corrutina acceda al reader a la vez
+            await self.auth()
 
-        if self.model == "raisecom":
-            try:
-                await self.controller.raisecom(self.reader, self.writer, self.prompt)
-                self.edit_table(self.id, 4, "✔")
-                self.gui.success_grid.SetCellTextColour(self.id, 4, wx.Colour(0, 128, 0))
-            except:
-                    self.edit_table(self.id, 4, "✘")
-                    self.gui.success_grid.SetCellTextColour(self.id, 4, wx.Colour(255, 0, 0))
-        elif self.model == "huawei":
-            #await huawei(reader, writer)
-            #print("es Huawei")
-            pass
-        elif self.model == "cisco":
-            #await cisco(reader, writer)
-            pass
-            #print("es Cisco")
+            if self.model == "raisecom":
+                await raisecom(self.reader, self.writer, self.prompt)
+            elif self.model == "huawei":
+                pass
+            elif self.model == "cisco":
+                pass
 
         print("Termina: " + str(self.host))
         self.writer.write("exit\n")
@@ -150,31 +124,24 @@ class Worker:
         self.writer.close()
         end_time = time.time()
         print(end_time - start_time)
-        
+        self.id += 1
 
     def edit_table(self, row, column, value):
-        if self.table != None:
-            self.table.SetCellValue(row, column, str(value)) 
+        if self.table is not None:
+            self.table.SetCellValue(row, column, str(value))
             self.gui.Update()
         
     def connect_gui(self, gui):
         self.gui = gui
         self.table = self.gui.success_grid
 
-async def work(ip):
-    worker = Worker()
-    await worker.process(ip, id)
-
-
-
 async def main():
-    #worker = Worker()
-    #await worker.process(IP_RAXLAB)
-    ips_to_validate = ["10.5.29.227"]
-    tasks = [work(ip) for ip in ips_to_validate]
+    worker = Worker()
+    ips_to_validate = [IP_RAXLAB, IP_LAB2924]
+
+    tasks = [worker.process(ip) for ip in ips_to_validate]
 
     await asyncio.gather(*tasks)
 
-    
-    #await proceso(IP_MANZANILLO)
-#asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

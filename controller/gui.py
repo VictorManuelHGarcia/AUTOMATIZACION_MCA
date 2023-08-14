@@ -74,13 +74,17 @@ class MainFrame(wx.Frame):
         
         # Tabla de direcciones IP ingresadas con éxito
         self.success_grid = gridlib.Grid(self.panel)
-        self.success_grid.CreateGrid(0, 3)
+        self.success_grid.CreateGrid(0, 5)
         self.success_grid.SetColLabelValue(0, "Ping")
         self.success_grid.SetColLabelValue(1, "Dirección IP")
         self.success_grid.SetColLabelValue(2, "Hostname")
+        self.success_grid.SetColLabelValue(3, "Modelo")
+        self.success_grid.SetColLabelValue(4, "Estatus:")
         self.success_grid.SetColSize(0, 80)
         self.success_grid.SetColSize(1, 150)
         self.success_grid.SetColSize(2, 200)
+        self.success_grid.SetColSize(3, 150)
+        self.success_grid.SetColSize(4, 80)
     
 
         # Agregar tablas al sizer del cuadro
@@ -107,13 +111,22 @@ class MainFrame(wx.Frame):
         self.validate_connectivity_btn.Hide()
         self.load_ips_btn.Hide()
         
-        self.success_grid.Bind( wx.grid.EVT_GRID_SELECT_CELL, self.prueba )
-        self.worker = Worker()
+        self.success_grid.Bind( wx.grid.EVT_GRID_SELECT_CELL, self.show_log)
+
+        self.ips = []
+        self.memory = {}
+    
+    def id_ip(self, group):
+        self.ips = {}
+        for id, ip in enumerate(group):
+            self.ips[ip] = id
+        return self.ips
+
 
     def on_validate_connectivity(self, event):
         num_rows = self.success_grid.GetNumberRows()
         ips_to_validate = [self.success_grid.GetCellValue(row, 1) for row in range(num_rows)]
-
+        self.id_ip(ips_to_validate)
         self.execute_commands_btn.Show()
 
         # Realizar pings en hilos separados
@@ -126,17 +139,23 @@ class MainFrame(wx.Frame):
         # Esperar a que todos los hilos finalicen
         for thread in threads:
             thread.join()
+        print(self.ips)
+        for ip, id in self.ips.items():
+            print(str(id) + " " + str(ip))
 
     def ping_ip_and_update_grid(self, ip):
         status = self.ping_ip(ip)
         #print(str(status))
         wx.CallAfter(self.update_grid_with_ping_result, ip, status)
 
+    async def work(self, ip, id):
+        worker = Worker()
+        worker.connect_gui(self)
+        await worker.process(ip, id)
+
     async def command_execute(self, ips):
-        #print(ips)
-        for host in ips:
-            await self.worker.process(host)
-        #await proceso(ip)
+        tasks = [self.work(ip, id) for ip, id in ips.items()]
+        await asyncio.gather(*tasks)
 
     def update_grid_with_ping_result(self, ip, status):
         num_rows = self.success_grid.GetNumberRows()
@@ -155,10 +174,11 @@ class MainFrame(wx.Frame):
             response_time = ping(ip, timeout=1)
             patron_ip = r'^(25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})\.(25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})\.(25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})\.(25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})$'
             if re.match(patron_ip, ip):
-                
+                print(ip)
                 #print(type(ip))
                 return response_time is not None
             else:
+                self.ips.pop(ip)
                 print("Esta IP no es valida")
                 return False
         except Exception:
@@ -196,17 +216,17 @@ class MainFrame(wx.Frame):
         self.update_success_table(ip_list)
 
     def on_execute_commands(self, event):
-        # Aquí el código para ejecutar los comandos con las IPs cargadas
-        num_rows = self.success_grid.GetNumberRows()
-        ips_to_validate = [self.success_grid.GetCellValue(row, 1) for row in range(num_rows)]
-        asyncio.run(self.command_execute(ips_to_validate))
+        asyncio.run(self.command_execute(self.ips))
+        self.ips = []
         """loop = asyncio.get_event_loop()
         loop.create_task(self.command_execute(ips_to_validate))"""
 
-    def prueba( self, event ):
-        row = int(event.Row)
-        ip = self.success_grid.GetCellValue(row, 1)
-        self.log_text.SetValue(ip)
+    def show_log( self, event ):
+        id = int(event.Row)
+        #AQUI VAMOS A C0ONSULTAR LA MEMORIA
+        log = self.memory.get(id)
+        if log:
+            self.log_text.SetValue(str(log))
         event.Skip()
 
 
@@ -217,7 +237,7 @@ class MainFrame(wx.Frame):
         self.success_grid.AppendRows(len(data))
         for row, ip in enumerate(data):
             self.success_grid.SetCellValue(row, 0, "")  # Dejar en blanco la celda de palomita
-            self.success_grid.SetCellValue(row, 1, ip)
+            self.success_grid.SetCellValue(row, 1, str(ip))
             self.success_grid.SetCellValue(row, 2, "")  # Dejar en blanco la celda de hostname
             
 

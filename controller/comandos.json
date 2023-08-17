@@ -1,23 +1,25 @@
 {
-    "raisecom":{
+    "PAN":{
 
-        "comando1":"oam enable",
-        "comando2":"oam passive",
-        "comando3":"oam notify dying-gasp enable"
+        "comando1":"interface vlan 850",
+        "comando2":"IP address 10.10.10.1 255.255.255.0",
+        "comando3":"no shutdown"
 
     },
 
-    "cisco":{
+    "AN":{
 
         "comando1":"configure terminal",
-        "comando2":"interface GigabitEthernet0/0/2",
-        "comando3":"description Prueba-31/07/2023-SCRIPT_PYTHON"
+        "comando2":"interface port 10",
+        "comando3":"switchport trunk allowed vlan add 850"
 
     },
 
-    "huawei":{
+    "CPE":{
 
-        "comando1":"display version"
+        "comando1":"configure terminal",
+        "comando2":"interface port 10",
+        "comando3":"switchport trunk allowed vlan add 850"
 
     }
 }

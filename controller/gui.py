@@ -8,6 +8,7 @@ from ping3 import ping
 import re
 from main import Worker
 import asyncio
+from ip_manager import validar_segmento_red, get_available_ips
 
 # Define la paleta de colores
 COLOR1 = wx.Colour(20, 79, 116)
@@ -25,7 +26,7 @@ class MainFrame(wx.Frame):
         self.panel.SetBackgroundColour(COLOR1)
         
         # Cuadro para los buscadores de archivos
-        file_pick_box = wx.StaticBox(self.panel, label="Selecciona los archivos: ")
+        file_pick_box = wx.StaticBox(self.panel, label="Cargar IP's: ")
         file_pick_box.SetForegroundColour(wx.WHITE)
         file_pick_sizer = wx.StaticBoxSizer(file_pick_box, wx.VERTICAL)
         
@@ -37,7 +38,25 @@ class MainFrame(wx.Frame):
         # Buscadores de archivos
         self.excel_file_path = ""
         
-        
+        self.calculate_sizer = wx.BoxSizer( wx.HORIZONTAL )
+
+        ##
+        #CAMPO PARA CALCULAR IP
+        self.lbl_calculate_ips = wx.StaticText( self.panel, wx.ID_ANY, u"Ingresa un segmento de red:", wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.lbl_calculate_ips.Wrap( -1 )
+        self.lbl_calculate_ips.SetForegroundColour( wx.SystemSettings.GetColour( wx.SYS_COLOUR_INFOBK ) )
+
+        self.calculate_sizer.Add( self.lbl_calculate_ips, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+        self.ctrl_calculate_ip = wx.TextCtrl( self.panel, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.calculate_sizer.Add( self.ctrl_calculate_ip, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+        self.btn_calculate_ips = wx.Button( self.panel, wx.ID_ANY, u"Calcular", wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.calculate_sizer.Add( self.btn_calculate_ips, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+        file_pick_sizer.Add(self.calculate_sizer, 0, wx.EXPAND | wx.ALL, 5)
+        ##
+
         self.excel_file_picker_btn = wx.Button(self.panel, label="Selecciona el archivo con las direcciones IP:")
         self.excel_file_picker_btn.SetBackgroundColour(COLOR5)
         self.excel_file_picker_btn.Bind(wx.EVT_BUTTON, self.on_excel_file_picker)
@@ -89,11 +108,16 @@ class MainFrame(wx.Frame):
 
         # Agregar tablas al sizer del cuadro
         result_sizer.Add(self.success_grid, 1, wx.EXPAND | wx.ALL, 5)
-        
+
+        log_box = wx.StaticBox(self.panel, label="Log: ")
+        log_box.SetForegroundColour(wx.WHITE)
+        log_sizer = wx.StaticBoxSizer(log_box, wx.VERTICAL)
+
         # Log de la ejecución de comandos
         self.log_text = wx.TextCtrl(self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY)
         self.log_text.SetBackgroundColour(wx.BLACK)
         self.log_text.SetForegroundColour(wx.WHITE)
+        log_sizer.Add(self.log_text, 1, wx.EXPAND | wx.ALL, 5)
         
         # Acomodar elementos en el sizer principal
         main_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -101,27 +125,38 @@ class MainFrame(wx.Frame):
         main_sizer.Add(file_pick_sizer, 0, wx.EXPAND | wx.ALL, 10)
         main_sizer.Add(buttons_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 10)
         main_sizer.Add(result_sizer, 1, wx.EXPAND | wx.ALL, 10)
-        main_sizer.Add(self.log_text, 1, wx.EXPAND | wx.ALL, 10)
+        main_sizer.Add(log_sizer, 1, wx.EXPAND | wx.ALL, 10)
         
         self.panel.SetSizer(main_sizer)
         self.Layout()
 
         self.execute_commands_btn.Hide()
         self.validate_connectivity_btn.Hide()
-        self.validate_connectivity_btn.Hide()
         self.load_ips_btn.Hide()
         
+        # Connect Events
         self.success_grid.Bind( wx.grid.EVT_GRID_SELECT_CELL, self.show_log)
+        self.btn_calculate_ips.Bind( wx.EVT_BUTTON, self.calculate_ips )
 
-        self.ips = []
+        self.ips = {}
         self.memory = {}
+        self.completed = 0
     
     def id_ip(self, group):
         self.ips = {}
         for id, ip in enumerate(group):
             self.ips[ip] = id
-        return self.ips
+        
 
+    def calculate_ips(self, event):
+        segmento = str(self.ctrl_calculate_ip.GetValue())
+        if validar_segmento_red(segmento):
+            ips = get_available_ips(segmento)
+            self.update_success_table(ips)
+            self.validate_connectivity_btn.Show()
+        else:
+            wx.MessageBox('Este es un aviso de advertencia.', 'Advertencia', wx.ICON_ERROR | wx.OK)
+        event.Skip()
 
     def on_validate_connectivity(self, event):
         num_rows = self.success_grid.GetNumberRows()
@@ -174,8 +209,10 @@ class MainFrame(wx.Frame):
             response_time = ping(ip, timeout=1)
             patron_ip = r'^(25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})\.(25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})\.(25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})\.(25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})$'
             if re.match(patron_ip, ip):
-                print(ip)
-                #print(type(ip))
+                if not response_time is not None:
+                    self.ips.pop(ip)
+                    #self.edit_table(3, 4, "✘ (N/A)", wx.Colour(255, 0, 0))
+                    return False
                 return response_time is not None
             else:
                 self.ips.pop(ip)
@@ -216,8 +253,10 @@ class MainFrame(wx.Frame):
         self.update_success_table(ip_list)
 
     def on_execute_commands(self, event):
+        self.memory = {}
+        self.completed = 0
         asyncio.run(self.command_execute(self.ips))
-        self.ips = []
+        self.ips = {}
         """loop = asyncio.get_event_loop()
         loop.create_task(self.command_execute(ips_to_validate))"""
 
@@ -227,8 +266,14 @@ class MainFrame(wx.Frame):
         log = self.memory.get(id)
         if log:
             self.log_text.SetValue(str(log))
+        else:
+            self.log_text.SetValue("")
         event.Skip()
 
+    def end_process(self):
+        self.completed += 1
+        if self.completed == len(self.ips):
+            wx.MessageBox('Todos los workers han finalizado la ejecución.', 'Procesamiento finalizado', wx.ICON_INFORMATION | wx.OK)
 
     def update_success_table(self, data):
         num_rows = self.success_grid.GetNumberRows()
@@ -240,6 +285,12 @@ class MainFrame(wx.Frame):
             self.success_grid.SetCellValue(row, 1, str(ip))
             self.success_grid.SetCellValue(row, 2, "")  # Dejar en blanco la celda de hostname
             
+    def edit_table(self, row, column, value, color = None):
+        self.success_grid.SetCellValue(row, column, str(value)) 
+        if color != None:
+            self.success_grid.SetCellTextColour(row, column, color)
+            self.Update()
+
 
 if __name__ == "__main__":
     app = wx.App(False)

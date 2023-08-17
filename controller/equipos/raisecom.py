@@ -30,34 +30,35 @@ class Raisecom:
             #llamar proceso del modelo
             print("Es un CPE")
             print("Es un ISCOM2608G")
-            self.worker.edit_table(self.worker.id, 3, "ISCOM2608G (CPE)")
+            self.worker.gui.edit_table(self.worker.id, 3, "ISCOM2608G (CPE)")
             await self.ISCOM2608(reader, writer)
         elif "RAX711-C".encode('utf-8') in output:
             #await RAX711C(reader, writer)
             print("Es un CPE")
             print("Es un RAX711-C")
-            self.worker.edit_table(self.worker.id, 3, "RAX711-C (CPE)")
+            self.worker.gui.edit_table(self.worker.id, 3, "RAX711-C (CPE)")
         elif "RAX711-R".encode('utf-8') in output:
             print("Es un CPE")
             print("Es un RAX711-R")
-            self.worker.edit_table(self.worker.id, 3, "RAX711-R (CPE)")
+            self.worker.gui.edit_table(self.worker.id, 3, "RAX711-R (CPE)")
             #await RAX711R(reader,writer)
         elif "RAX721".encode('utf-8') in output:
             print("Es un AN")
             print("Es un RAX721")
-            self.worker.edit_table(self.worker.id, 3, "RAX721 (AN)")
+            self.worker.gui.edit_table(self.worker.id, 3, "RAX721 (AN)")
             await self.puertos2(reader, writer)
             await self.RAX721(reader, writer)
         elif "ISCOM2924".encode('utf-8') in output:
             print("Es un AN")
             print("Es un ISCOM2924")
-            self.worker.edit_table(self.worker.id, 3, "ISCOM2924 (AN)")
+            await self.puertos(reader, writer, 28)
+            self.worker.gui.edit_table(self.worker.id, 3, "ISCOM2924 (AN)")
             #print(await puertos(reader,writer,28))
             #await ISCOM29XX(reader, writer,28)
         elif "ISCOM2948".encode('utf-8') in output:
             print("Es un AN")
             print("Es un ISCOM2948")
-            self.worker.edit_table(self.worker.id, 3, "ISCOM2948 (AN)")
+            self.worker.gui.edit_table(self.worker.id, 3, "ISCOM2948 (AN)")
             await self.puertos(reader,writer,52)
         else:
             print("Modelo desconocido")
@@ -175,6 +176,7 @@ class Raisecom:
         p = await self.puertos2(reader, writer)
         writer.write("config terminal\n") 
         out = await reader.readuntil(b"#")
+        print(type(out))
         for puerto in p:
             writer.write("interface " + puerto + "\n")
             out += await reader.readuntil(b"#")

@@ -1,44 +1,34 @@
-import telnetlib3
-import asyncio
+import ipaddress
+import re
 
-IP_PAN = "10.4.33.193"
-
-user = 0x726f647269676f2e6469617a
-password = 0x686f6c613132333435363839313040
-TACACS_USER = bytes_hex.decode('utf-8')
-TACACS_PASS = format(password, 'x')
-
-PASSWORD = ""
-
-segmento = "" 
-
-async def proceso(ip):
-    host = ip
-    port = 23  
-
-    # Establecer la conexión Telnet
-    reader, writer = await telnetlib3.open_connection(host, port)
-
-    reader.readuntil(b"Username:")
-    writer.write("")
-
-    writer.write("exit\n")
-    await writer.drain()
-    writer.close()
-    
-async def find(reader, word, max_time=1):
+def get_available_ips(network_segment):
     try:
-        response = await asyncio.wait_for(reader.readuntil(word), timeout=max_time)
-        response = True
-    except:
-        response = False
-    #print(response)
-    return response
+        network = ipaddress.IPv4Network(network_segment, strict=False)
+        available_ips = [str(ip) for ip in network.hosts()][1:]
+        return available_ips
+    except ValueError:
+        return None
+
+# Ejemplo de uso
 
 
-async def main():
-    await proceso(IP_PAN)
+def validar_segmento_red(segmento):
+    patron = r'^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/(3[0-2]|[12]?[0-9])$'
+    return re.match(patron, segmento) is not None
+
+"""#segmento = "192.168.1.1/32"
+if validar_segmento_red(segmento):
+    print("Segmento de red válido.")
+else:
+    print("Segmento de red inválido.")"""
 
 
-#asyncio.run(main())
-print(TACACS_PASS)
+"""network_segment = "192.168.1.0/27"
+available_ips = get_available_ips(network_segment)
+
+if available_ips:
+    print("Direcciones IP disponibles (excepto la primera IP utilizable):")
+    for ip in available_ips:
+        print(ip)
+else:
+    print("Segmento de red no válido.")"""

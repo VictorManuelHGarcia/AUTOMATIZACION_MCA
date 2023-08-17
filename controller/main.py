@@ -54,7 +54,8 @@ class Worker:
                     {'user':USER_MCA, 'pass' : PASS_MCA}, 
                     {'user':TACACS_USER, 'pass':TACACS_PASS},
                     {'user':USER_MCA_MIN, 'pass':PASS_MCA},
-                    {'user':USER_HUAWEI, 'pass':PASS_HUAWEI}]
+                    {'user':USER_HUAWEI, 'pass':PASS_HUAWEI},
+                    {'user':"not found", 'pass':"***"}]
         self.host = None
         self.PORT = 23
         self.LIMIT_SESSION = 3
@@ -63,6 +64,19 @@ class Worker:
         self.id = 0
         self.table = None
         self.controller = None
+    
+    async def get_hostname(self):
+        prompt = b"#"
+        if self.model == "huawei":
+            prompt = b">"
+        self.writer.write("\n")
+        await self.writer.drain()
+        text = await find(self.reader,prompt)
+        self.writer.write("\n")
+        await self.reader.readuntil(prompt)
+        text = re.sub(r'[\r\n\s+]', '', text)
+        self.gui.edit_table(self.id, 2, text)
+
     async def auth(self):
         flag = False
         # Establecer la conexión Telnet
@@ -73,6 +87,7 @@ class Worker:
             self.model = None
 
             #VERIFICAR RAMA DEL VENDOR
+            
             if await find(self.reader, b"Login:"):
                 self.model = "raisecom"
                 self.controller = Raisecom(self)
@@ -85,9 +100,11 @@ class Worker:
                 #print(i)
                 #CARGAR CREDENCIALES
                 username = i['user'] ; password = i['pass']
+                if username == "not found":
+                    return False
                 self.writer.write(username + "\n")
                 await self.writer.drain()
-                await self.writer.drain()
+                #await self.writer.drain()
                 await self.reader.readuntil(b"Password:")
                 self.writer.write(password + "\n")
                 await self.writer.drain()
@@ -98,26 +115,18 @@ class Worker:
                         self.model = "cisco"
                     print("Comienza: " + str(self.host))
                     self.prompt = b"#"
-                    flag = True
-                    break
+                    return True
                 elif await find(self.reader, b">"):
                     if not self.model == "raisecom":
                         self.model = "huawei"
                     self.prompt = b">"
-                    flag = True
-                    break
-            
+                    return True
+                if self.model == "raisecom":
+                    await self.reader.readuntil(b"Login:")
+                else:
+                    await self.reader.readuntil(b"Username:")
             #YA INGRESAMOS
-            if flag:
-                self.writer.write("\n")
-                await self.writer.drain()
-                text = await find(self.reader,b"#")
-                self.writer.write("\n")
-                await self.reader.readuntil(b"#")
-                text = re.sub(r'[\r\n\s+]', '', text)
-                self.edit_table(self.id, 2, text)
-                #print(modelo)
-                break
+
 
 
     async def process(self, ip, id):
@@ -125,41 +134,49 @@ class Worker:
         self.host = ip
         self.id = id
         
-        await self.auth()
-
-        if self.model == "raisecom":
-            try:
-                await self.controller.raisecom(self.reader, self.writer, self.prompt)
-                self.edit_table(self.id, 4, "✔")
-                self.gui.success_grid.SetCellTextColour(self.id, 4, wx.Colour(0, 128, 0))
-            except:
-                    self.edit_table(self.id, 4, "✘")
-                    self.gui.success_grid.SetCellTextColour(self.id, 4, wx.Colour(255, 0, 0))
-        elif self.model == "huawei":
-            #await huawei(reader, writer)
-            #print("es Huawei")
-            pass
-        elif self.model == "cisco":
-            #await cisco(reader, writer)
-            pass
-            #print("es Cisco")
-
-        print("Termina: " + str(self.host))
-        self.writer.write("exit\n")
-        await self.writer.drain()
-        self.writer.close()
-        end_time = time.time()
-        print(end_time - start_time)
+        try:
+            session = await self.auth()    
+        except:
+            self.gui.edit_table(self.id, 4, "✘ (No accedió al equipo)", wx.Colour(255, 0, 0))
+            session = False
         
+        if session:
+            if self.model == "raisecom":
+                try:
+                    await self.get_hostname()
+                    await self.controller.raisecom(self.reader, self.writer, self.prompt)
+                    self.gui.edit_table(self.id, 4, "✔", wx.Colour(0, 128, 0))
+                except:
+                        self.gui.edit_table(self.id, 4, "✘", wx.Colour(255, 0, 0))
+            elif self.model == "huawei":
+                #await huawei(reader, writer)
+                await self.get_hostname()
+                self.gui.edit_table(self.id, 3, "Huawei")
+                self.gui.edit_table(self.id, 4, "⚠ (N/A)", wx.Colour(182, 159, 11))
+                
+            elif self.model == "cisco":
+                #await cisco(reader, writer)
+                await self.get_hostname()
+                self.gui.edit_table(self.id, 3, "Cisco")
+                self.gui.edit_table(self.id, 4, "⚠ (N/A)", wx.Colour(182, 159, 11))
+                #print("es Cisco")
+            print("Termina: " + str(self.host))
+            self.writer.write("exit\n")
+            await self.writer.drain()
+            self.writer.close()
+            end_time = time.time()
+            print(end_time - start_time)
+        else:
+            self.gui.edit_table(self.id, 4, "✘ (No pudo entrar)", wx.Colour(255, 0, 0))
+        self.finish()
 
-    def edit_table(self, row, column, value):
-        if self.table != None:
-            self.table.SetCellValue(row, column, str(value)) 
-            self.gui.Update()
+    def finish(self):
+        if self.gui != None:
+            self.gui.end_process()
+
         
     def connect_gui(self, gui):
         self.gui = gui
-        self.table = self.gui.success_grid
 
 async def work(ip):
     worker = Worker()
@@ -170,7 +187,7 @@ async def work(ip):
 async def main():
     #worker = Worker()
     #await worker.process(IP_RAXLAB)
-    ips_to_validate = ["10.5.29.227"]
+    ips_to_validate = [""]
     tasks = [work(ip) for ip in ips_to_validate]
 
     await asyncio.gather(*tasks)
